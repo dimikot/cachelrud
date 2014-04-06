@@ -12,7 +12,7 @@ from multiprocessing.queues import Empty as QueueEmpty, Full as QueueFull
 from multiprocessing import Queue, Process
 
 
-ERROR_RECOVER_RECHECK_DT = 5
+ERROR_RECOVER_RECHECK_DT = 20
 PARENT_CHECK_TIMEOUT = 2
 CONFIGS = []
 DEFAULT_SECTION = "DEFAULT"
@@ -319,6 +319,14 @@ def loop_reaper(log, conf):
             if section not in storages:
                 storages[section] = get_storage(log_section, dict(conf.items(section)))
             storage = storages[section]
+            if not storage.can_write():
+                log_section.debug(
+                    "This connection is not writable. Possibly the node is not master, so retry in %d seconds.",
+                    ERROR_RECOVER_RECHECK_DT
+                )
+                del storages[section]
+                next_round_time[section] = t0 + ERROR_RECOVER_RECHECK_DT
+                continue
             log_section.debug("Getting stats")
             try:
                 size, count = storage.get_stat()

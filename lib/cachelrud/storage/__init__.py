@@ -8,6 +8,12 @@ class Base(object):
         """
         raise NotImplementedError()
 
+    def can_write(self):
+        """
+        :rtype: bool
+        """
+        raise NotImplementedError()
+
     def touch_keys(self, keys):
         """
         :type keys: list[str]

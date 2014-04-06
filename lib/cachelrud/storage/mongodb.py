@@ -36,17 +36,24 @@ class Storage(Base):
         if dsn_parts is None:
             raise Exception("Cannot parse MongoDB DSN '%s'!" % dsn)
         mongo_dsn, mongo_dbname, mongo_qs = dsn_parts.group(1), dsn_parts.group(3), dsn_parts.group(4)
-        mongo_qs = dict(urlparse.parse_qsl(mongo_qs))
+        mongo_qs = dict(urlparse.parse_qsl(mongo_qs)) if mongo_qs else {}
         if 'replicaSet' in params:
             mongo_qs['replicaSet'] = params['replicaSet']
         if 'dbname' in params:
             mongo_dbname = params['dbname']
         mongo_dsn = mongo_dsn + "/" + mongo_dbname + "?" + urllib.urlencode(mongo_qs)
         log.info("Connecting to %s", mongo_dsn)
-        client = pymongo.Connection(mongo_dsn)
+        client = pymongo.Connection(mongo_dsn, read_preference=pymongo.ReadPreference.PRIMARY)
         db = client[mongo_dbname]
         collection = db[params['collection']]
         return Storage(log, collection, params['timestampfield'])
+
+    def can_write(self):
+        try:
+            list(self._collection.find(limit=1, fields=['_id']))
+            return True
+        except pymongo.errors.AutoReconnect:
+            return False
 
     def touch_keys(self, keys):
         self._collection.update(

@@ -86,3 +86,35 @@ you may create a file lib/cachelrud/storage/your_database_name.py
 
 You may also add support for more frameworks/languages, please put
 client-side libraries to binding/ directory.
+
+
+WORKING WITH A REPLICA SET
+--------------------------
+
+Suppose we have a replica set with 3 machines: A, B and C. Assume
+A is the master (primary) node currently. Run CacheLRUd daemon on
+all this nodes for fail-tolerance. Then you have 2 different ways
+to configure /etc/cachelrud.conf:
+
+1. If you want only one CacheLRUd daemon to be a reaper (a process
+   who deletes outdated LRU keys), set up in cachelrud.conf at A:
+
+   dsn = "mongodb://user:password@localhost/"
+
+   and send UDP messages to the master A node only (it's typically
+   easy to detect automatically who is primary by running something
+   like client.getConnections() at the client side and check
+   connection_type field). If remastering happens and A becomes
+   a secondary (and e.g. B is a new master), CacheLRUd on B will
+   activate reaping, and your application will also need to send UDP
+   messages to the new master B.
+
+2. If one reaper is not enough (you have too high keys creation
+   rate, so you want to reap in parallel), specify replicaSet in
+   your cachelrud.conf:
+
+   dsn = "mongodb://user:password@localhost/?replicaSet=YOUR_RS"
+
+   After that you may send UDP messages to ANY of CacheLRUd daemons:
+   they will accept them and, at the same time, perform reaping
+   in parallel.
