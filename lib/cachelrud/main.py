@@ -123,6 +123,10 @@ def parse_config(configs):
         for k, v in conf.items(DEFAULT_SECTION):
             if not conf.has_option(section, k):
                 conf.set(section, k, v)
+        for k, v in conf.items(section):
+            v = re.sub(r'^\s*"|"\s*$', '', v) # remove quotes
+            conf.set(section, k, v)
+
     conf.remove_section(DEFAULT_SECTION)
 
     if not conf.sections():
