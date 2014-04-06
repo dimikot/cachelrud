@@ -42,7 +42,7 @@ class Storage(Base):
         if 'dbname' in params:
             mongo_dbname = params['dbname']
         mongo_dsn = mongo_dsn + "/" + mongo_dbname + "?" + urllib.urlencode(mongo_qs)
-        log.info("Connecting to %s", mongo_dsn)
+        log.debug("Connecting to %s", mongo_dsn)
         client = pymongo.Connection(mongo_dsn, read_preference=pymongo.ReadPreference.PRIMARY)
         db = client[mongo_dbname]
         collection = db[params['collection']]
