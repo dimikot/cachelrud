@@ -1,0 +1,117 @@
+#!/bin/bash
+# Start/stop the cachelrud daemon.
+#
+# chkconfig: - 85 15
+# description: CacheLRUd: implements cache LRU cleanup on various databases.
+# processname: cachelrud
+# config: /etc/cachelrud.conf
+# pidfile: /var/run/cachelrud.pid
+#
+### BEGIN INIT INFO
+# Provides:          cachelrud
+# Required-Start:
+# Required-Stop: 
+# Default-Start:     2 3 4 5
+# Default-Stop:      1
+# Short-Description: CacheLRUd: implements cache LRU cleanup on various databases.
+# Description:       CacheLRUd: implements cache LRU cleanup on various databases.
+### END INIT INFO
+
+SVCNAME=`basename $0`
+if [ ${SVCNAME:0:1} = "S" -o ${SVCNAME:0:1} = "K" ]; then
+    SVCNAME=${SVCNAME:3}
+fi
+
+CWD="/opt/cachelrud"
+PIDPREFIX="/var/run/${SVCNAME}"
+CONFIGS="/etc/cachelrud*.conf"
+
+[ -f /etc/default/${SVCNAME} ] && . /etc/default/${SVCNAME}
+[ -f /etc/sysconfig/${SVCNAME} ] && . /etc/sysconfig/${SVCNAME}
+
+BIN="$CWD/cachelrud"
+
+start() {
+	export CONF
+	for CONF in $CONFIGS; do
+	    CONFNAME=`echo $CONF | perl -pe 's{^.*/|[.].*}{}sg'`
+		PIDFILE=${PIDPREFIX}_$CONFNAME.pid
+		PID=`cat $PIDFILE 2>/dev/null`
+		if [ "$PID" != "" ] && kill -s 0 $PID 2>/dev/null; then
+			echo "$SVCNAME for $CONF is already running"
+		else
+			rm -f $PIDFILE 2>/dev/null
+			cd $CWD || exit 1
+			$BIN --pidfile=$PIDFILE --name=$CONFNAME $CONF
+			sleep 1
+			PID=`cat $PIDFILE 2>/dev/null`
+			if [ "$PID" != "" ]; then
+				echo "OK: $CONF"
+			else
+				echo "FAILED: $CONF; see logs"
+			fi
+		fi
+	done
+}
+
+stop() {
+	for CONF in $CONFIGS; do
+	    CONFNAME=`echo $CONF | perl -pe 's{^.*/|[.].*}{}sg'`
+		PIDFILE=${PIDPREFIX}_$CONFNAME.pid
+		PID=`cat $PIDFILE 2>/dev/null`
+		if [ "$PID" == "" ]; then
+			echo "$SVCNAME for $CONF is not running (pid file is empty)"
+		else
+			kill $PID
+			echo "OK: $CONF"
+		fi
+	done
+}
+
+reload() {
+	stop
+	sleep 4
+	start
+}
+
+status() {
+	for CONF in $CONFIGS; do
+	    CONFNAME=`echo $CONF | perl -pe 's{^.*/|[.].*}{}sg'`
+		PIDFILE=${PIDPREFIX}_$CONFNAME.pid
+		PID=`cat $PIDFILE 2>/dev/null`
+		if [ "$PID" == "" ]; then
+			echo "$SVCNAME for $CONF is not running (pid file is empty)"
+			exit 1
+		else
+			# Send SIGHUP to process group.
+			kill -s 0 $PID 2>/dev/null || { echo "$SVCNAME for $CONF is not running (no process with such pid)"; exit 1; }
+		fi
+	done
+	echo "$SVCNAME for all configs is running"
+}
+
+
+case $1 in
+	start)
+		start
+	;;
+	stop)
+		stop
+	;;
+	restart)
+		stop
+		sleep 2
+		start
+	;;
+	reload)
+		reload
+	;;
+	status)
+		status
+	;;
+	*)
+		echo "Usage:"
+		echo "  $0 {start|stop|restart|reload}"
+		exit 1
+	;;
+esac
