@@ -73,7 +73,6 @@ chkconfig cachelrud on
 
 ## ...or for Debian/Ubuntu:
 update-rc.d cachelrud defaults
-update-rc.d cachelrud start
 
 
 SUPPORT FOR YOUR FAVORITE DATABASE
