@@ -39,6 +39,23 @@ To eliminate single point of failure, install CacheLRUd service on each
 MongoDB node and send UDP notifications to alive nodes only.
 
 
+HOW TO SEND UDP PACKETS
+-----------------------
+
+To notify CacheLRUd that a cache key "key" has been read recently in a
+collection configured as "[collection_name]" in /etc/cachelrud.conf,
+just send an UDP packet to the daemon's port (defaults to 43521):
+
+    collection_name:key
+
+If you have many hits, you may group them and send in a single UDP
+message separated by newline characters (to save bandwidth):
+
+    collection_name:key1
+    collection_name:key2
+    ...
+
+
 INSTALLATION ON LINUX
 ---------------------
 
