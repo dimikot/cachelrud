@@ -171,6 +171,7 @@ def loop_watchdog(log, conf):
                         updater_queue,
                         conf.sections(),
                         conf.getint(section, 'bucket_size'),
+                        conf.getint(section, 'bucket_flush_max_time')
                     ))
                     listeners[key].start()
                     log.info("Spawned a new listener for %s:%d: pid=%d", listenhost, listenport, listeners[key].pid)
@@ -200,7 +201,7 @@ def loop_watchdog(log, conf):
         time.sleep(1)
 
 
-def loop_listener(log, listenhost, listenport, updater_queue, allowed_sections, bucket_size):
+def loop_listener(log, listenhost, listenport, updater_queue, allowed_sections, bucket_size, bucket_flush_max_time):
     """
     :type log: logging.Logger
     :type listenhost: str
@@ -217,16 +218,34 @@ def loop_listener(log, listenhost, listenport, updater_queue, allowed_sections, 
     sock.bind((listenhost if listenhost != "*" else "0.0.0.0", listenport))
     sock.settimeout(PARENT_CHECK_TIMEOUT)
     buckets = {k: {} for k in allowed_sections}
+    last_queue_put_at = time.time()
+
+    def flush_buckets(sec):
+        bucket = buckets[sec]
+        if not bucket:
+            return
+        try:
+            updater_queue.put_nowait((sec, bucket.keys()))
+        except QueueFull:
+            log.error("Queue is full, possibly updater process is dead?")
+            log.error("Because of that all keys (%d) are discarded.", len(bucket))
+        buckets[sec] = {}
+
     while True:
         try:
             data, addr = sock.recvfrom(UDP_BUF_SIZE)
         except socket.timeout:
             if not check_parent_running(log, ppid):
                 return
+            if time.time() > last_queue_put_at + bucket_flush_max_time:
+                last_queue_put_at = time.time()
+                for section in allowed_sections:
+                    flush_buckets(section)
             continue
         if not data:
             continue
-        log.debug("Received a datagram:")
+
+        log.debug("Received a datagram from %s:%s", addr[0], addr[1])
         for line in data.split("\n"):
             line = line.strip()
             if not line:
@@ -237,15 +256,10 @@ def loop_listener(log, listenhost, listenport, updater_queue, allowed_sections, 
                 if section not in allowed_sections:
                     log.warning("Unknown section name: '%s'", section)
                     continue
-                bucket = buckets[section]
-                bucket[key] = 1
-                if len(bucket) >= bucket_size:
-                    try:
-                        updater_queue.put_nowait((section, bucket.keys()))
-                    except QueueFull, e:
-                        log.error("Queue is full, possibly updater process is dead?")
-                        log.error("Because of that all keys (%d) are discarded.", len(bucket))
-                    buckets[section] = {}
+                buckets[section][key] = 1
+                if len(buckets[section]) >= bucket_size:
+                    last_queue_put_at = time.time()
+                    flush_buckets(section)
             except ValueError:
                 log.info("Message should have format 'section_name:id', but '%s' received", line)
 
