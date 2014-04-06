@@ -39,16 +39,18 @@ To eliminate single point of failure, install CacheLRUd service on each
 MongoDB node and send UDP notifications to alive nodes only.
 
 
-HOW TO SEND UDP PACKETS
------------------------
+HOW TO SEND UDP PACKETS TO THE DAEMON
+-------------------------------------
 
-To notify CacheLRUd that a cache key "key" has been read recently in a
-collection configured as "[collection_name]" in /etc/cachelrud.conf,
+See binding/ directory for client-side libraries.
+
+In general, to notify CacheLRUd that a cache key "key" has been read recently
+in a collection configured as "[collection_name]" in /etc/cachelrud.conf,
 just send an UDP packet to the daemon's port (defaults to 43521):
 
     collection_name:key
 
-If you have many hits, you may group them and send in a single UDP
+If you register many hits, you may group them and send in a single UDP
 message separated by newline characters (to save bandwidth):
 
     collection_name:key1
@@ -75,9 +77,12 @@ chkconfig cachelrud on
 update-rc.d cachelrud defaults
 
 
-SUPPORT FOR YOUR FAVORITE DATABASE
-----------------------------------
+SUPPORT FOR YOUR FAVORITE DATABASE/LANGUAGE
+-------------------------------------------
 
 CacheLRUd is written in Python. To make it support a new database,
 you may create a file lib/cachelrud/storage/your_database_name.py
-(use mongodb.py for some inspiration).
+(use mongodb.py for inspiration).
+
+You may also add support for more frameworks/languages, please put
+client-side libraries to binding/ directory.
