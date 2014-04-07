@@ -22,14 +22,14 @@ if [ ${SVCNAME:0:1} = "S" -o ${SVCNAME:0:1} = "K" ]; then
     SVCNAME=${SVCNAME:3}
 fi
 
-CWD="/opt/cachelrud"
+BINDIR="/opt/cachelrud/bin"
 PIDPREFIX="/var/run/${SVCNAME}"
 CONFIGS="/etc/cachelrud*.conf"
 
 [ -f /etc/default/${SVCNAME} ] && . /etc/default/${SVCNAME}
 [ -f /etc/sysconfig/${SVCNAME} ] && . /etc/sysconfig/${SVCNAME}
 
-BIN="$CWD/cachelrud"
+BIN="$BINDIR/cachelrud"
 
 start() {
 	export CONF
@@ -41,7 +41,7 @@ start() {
 			echo "$SVCNAME for $CONF is already running"
 		else
 			rm -f $PIDFILE 2>/dev/null
-			cd $CWD || exit 1
+			cd $BINDIR || exit 1
 			$BIN --pidfile=$PIDFILE --name=$CONFNAME $CONF
 			sleep 1
 			PID=`cat $PIDFILE 2>/dev/null`

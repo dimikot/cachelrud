@@ -52,7 +52,7 @@ def main():
 
     # Parse config.
     conf = parse_config([
-        os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + "/../..") + "/cachelrud.conf",
+        os.path.abspath(os.path.dirname(os.path.abspath(__file__)) + "/..") + "/cachelrud.conf",
         opt_config
     ])
 

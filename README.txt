@@ -64,7 +64,7 @@ INSTALLATION ON LINUX
 ## Install the service on EACH MongoDB NODE:
 cd /opt
 git clone git@github.com:DmitryKoterov/cachelrud.git
-ln -s /opt/cachelrud/cachelrud.init /etc/init.d/cachelrud
+ln -s /opt/cachelrud/bin/cachelrud.init /etc/init.d/cachelrud
 
 ## Configure:
 cp /opt/cachelrud/cachelrud.conf /etc/cachelrud.conf  # and then edit
