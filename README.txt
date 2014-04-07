@@ -1,5 +1,5 @@
 CacheLRUd: implements cache LRU cleanup on various databases (e.g. MongoDB)
-Version: 0.55
+Version: 0.56
 Author: Dmitry Koterov, dkLab (C)
 GitHub: http://github.com/DmitryKoterov/
 License: GPL2
