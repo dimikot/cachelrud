@@ -59,7 +59,7 @@ class Storage(Base):
         self._collection.update(
             {'_id': {'$in': keys}},
             {'$set': {self._timestampfield: datetime.datetime.utcnow()}},
-            w=0
+            w=0, multi=True
         )
 
     def get_stat(self):
