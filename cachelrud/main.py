@@ -256,7 +256,7 @@ def loop_listener(log, listenhost, listenport, updater_queue, allowed_sections, 
                 continue
             log.debug("<-- %s", line)
             try:
-                section, key = line.split(":", 2)
+                section, key = line.split(":", 1)
                 if section not in allowed_sections:
                     log.warning("Unknown section name: '%s'", section)
                     continue
