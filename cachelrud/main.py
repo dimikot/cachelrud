@@ -19,6 +19,8 @@ DEFAULT_SECTION = "DEFAULT"
 UDP_BUF_SIZE = 10240
 UPDATER_QUEUE_MAX_SIZE = 1000
 
+check_parent_running_last_check_at = 0
+
 
 def main():
     """
@@ -236,16 +238,19 @@ def loop_listener(log, listenhost, listenport, updater_queue, allowed_sections, 
         buckets[sec] = {}
 
     while True:
+        if not check_parent_running(log, ppid):
+            return
+
         try:
             data, addr = sock.recvfrom(UDP_BUF_SIZE)
         except socket.timeout:
-            if not check_parent_running(log, ppid):
-                return
+            # In loaded systems this never happens: there are always pending messages.
             if time.time() > last_queue_put_at + bucket_flush_max_time:
                 last_queue_put_at = time.time()
                 for section in allowed_sections:
                     flush_buckets(section)
             continue
+
         if not data:
             continue
 
@@ -279,11 +284,11 @@ def loop_updater(log, conf, updater_queue):
     ppid = os.getppid()
     storages = {}
     while True:
+        if not check_parent_running(log, ppid):
+            return
         try:
             section, keys = updater_queue.get(True, PARENT_CHECK_TIMEOUT)
         except QueueEmpty:
-            if not check_parent_running(log, ppid):
-                return
             continue
         log_section = log.getChild(section)
         log_section.debug("Received a command to touch %d keys", len(keys))
@@ -307,7 +312,6 @@ def loop_reaper(log, conf):
     storages = {}
     next_round_time = {}
     while True:
-        time.sleep(1)
         if not check_parent_running(log, ppid):
             return
 
@@ -384,6 +388,12 @@ def check_parent_running(log, ppid):
     :type ppid: int
     :rtype: bool
     """
+    global check_parent_running_last_check_at
+    t0 = time.time()
+    if t0 < check_parent_running_last_check_at + PARENT_CHECK_TIMEOUT:
+        return True
+
+    check_parent_running_last_check_at = t0
     try:
         os.kill(ppid, 0)
         return True
