@@ -11,7 +11,6 @@ from ConfigParser import ConfigParser
 from multiprocessing.queues import Empty as QueueEmpty, Full as QueueFull
 from multiprocessing import Queue, Process
 
-
 ERROR_RECOVER_RECHECK_DT = 20
 PARENT_CHECK_TIMEOUT = 2
 CONFIGS = []
@@ -156,21 +155,32 @@ def loop_watchdog(log, conf):
     :type conf: ConfigParser
     :rtype: None
     """
+    updater_queue = Queue(UPDATER_QUEUE_MAX_SIZE)
     listeners = {}
     updater = None
     reaper = None
-    updater_queue = Queue(UPDATER_QUEUE_MAX_SIZE)
+
     log.info("Running watchdog loop")
     while True:
         try:
+            # If somebody dies, respawn all processes.
+            if len(filter(lambda l: not l.is_alive(), listeners.values())) or (updater is not None and not updater.is_alive()):
+                # We have to kill everybody, because else Queue does not work (deadlock).
+                log.warning("Some of child processes died unexpectedly, respawning everybody.")
+                for l in listeners.values():
+                    l.terminate()
+                if updater is not None:
+                    updater.terminate()
+                updater_queue = Queue(UPDATER_QUEUE_MAX_SIZE)
+                listeners = {}
+                updater = None
+
             for section in conf.sections():
                 # Respawn listeners.
                 listenhost = conf.get(section, "listenhost")
                 listenport = conf.getint(section, "listenport")
                 key = listenhost + ":" + str(listenport)
-                if key not in listeners or not listeners[key].is_alive():
-                    if key in listeners:
-                        log.warning("Listener %d died unexpectedly, respawning.", listeners[key].pid)
+                if key not in listeners:
                     listeners[key] = Process(target=daemon_helper.exceptions_to_log(log, loop_listener), args=(
                         log.getChild("listener"),
                         listenhost, listenport,
@@ -181,10 +191,9 @@ def loop_watchdog(log, conf):
                     ))
                     listeners[key].start()
                     log.info("Spawned a new listener for %s:%d: pid=%d", listenhost, listenport, listeners[key].pid)
+
                 # Respawn updater.
-                if updater is None or not updater.is_alive():
-                    if updater is not None:
-                        log.warning("Updater %d died unexpectedly, respawning.", updater.pid)
+                if updater is None:
                     updater = Process(target=daemon_helper.exceptions_to_log(log, loop_updater), args=(
                         log.getChild("updater"),
                         conf,
@@ -192,6 +201,7 @@ def loop_watchdog(log, conf):
                     ))
                     updater.start()
                     log.info("Spawned a new updater: pid=%d", updater.pid)
+
                 # Respawn reaper.
                 if reaper is None or not reaper.is_alive():
                     if reaper is not None:
@@ -202,6 +212,7 @@ def loop_watchdog(log, conf):
                     ))
                     reaper.start()
                     log.info("Spawned a new reaper: pid=%d", reaper.pid)
+
         except Exception, e:
             log.error("%s: %s", str(e.__class__.__name__), str(e))
         time.sleep(1)
@@ -231,6 +242,7 @@ def loop_listener(log, listenhost, listenport, updater_queue, allowed_sections, 
         if not bucket:
             return
         try:
+            log.debug("Flushing %d keys to updater. Queue size before: %d", len(bucket), updater_queue.qsize())
             updater_queue.put_nowait((sec, bucket.keys()))
         except QueueFull:
             log.error("Queue is full, possibly updater process is dead?")
@@ -254,12 +266,13 @@ def loop_listener(log, listenhost, listenport, updater_queue, allowed_sections, 
         if not data:
             continue
 
-        log.debug("Received a datagram from %s:%s", addr[0], addr[1])
-        for line in data.split("\n"):
+        lines = data.split("\n")
+        log.debug("Received a datagram from %s:%s with %d bytes, %d key(s)", addr[0], addr[1], len(data), len(lines))
+        for line in lines:
             line = line.strip()
             if not line:
                 continue
-            log.debug("<-- %s", line)
+            #log.debug("<-- %s", line)
             try:
                 section, key = line.split(":", 1)
                 if section not in allowed_sections:
